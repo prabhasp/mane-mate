@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<body style="background:black; overflow: hidden;">
+<div style="position:relative;width:1280px; height: 800px; overflow: hidden;"> 
+  <img id="paper" src="static/img/paper.jpg" width="1280" height="800" 
+       style="position:absolute; left:0; top:0;"></img>
+  <canvas id="canvas" style="position:absolute; left: 0; top: 0" width="1280" height="800"></canvas>
+  <canvas id="trans-c" width="1280" height="800" style="position:absolute; top: 800; visibility: hidden"></canvas>
+  <canvas id="dhaka-c" width="1280" height="800" style="position:absolute; top: 800; visibility: hidden"></canvas>
+</div>
+<script src="static/socket.io.js"></script>
+<script src="static/d3.v3.min.js"></script>
+<script>
+
+var randEl = function(arr) { 
+    return arr[Math.floor(Math.random() * arr.length)];
+};
+
+var canvas = d3.select("#canvas"),
+    context = canvas.node().getContext("2d"),
+    width = canvas.property("width"),
+    height = canvas.property("height"),
+    image = context.createImageData(width, height),
+    img = new Image(),
+    timg = new Image(),
+    tmask, dhakapx,
+    initialFloodSpeed = 0,
+    floodSpeed = initialFloodSpeed,
+    dContext = d3.select('#dhaka-c').node().getContext("2d"),
+    timgSrces = ['mask_cycle.png', 'mask_dragon.png', 'mask_grass.png',
+                 'mask_hajari.png', 'mask_kite.png', 'mask_macha.png',
+                 'mask_madal.png', 'mask_swing.png'];
+
+  /* Dhaka image: set src and make visible */
+  img.src = 'static/img/dhaka' + Math.floor(Math.random() * 9) + '.jpg';
+  img.onload = function() {
+      dContext.drawImage(img, 0, 0, width, height);
+      dhakapx = dContext.getImageData(0, 0, width, height);
+  };
+  /* Load the transparency canvas */
+  timg.src = 'static/maneimg/' + randEl(timgSrces);
+  timg.onload = function() {
+    dContext.drawImage(timg, 0, 0, width, height);
+    tmask = dContext.getImageData(0, 0, width, height);
+  };
+
+var worker = new Worker("static/generate-randomized-depth-first-traversal.js");
+worker.postMessage({width: width, height: height});
+worker.addEventListener("message", function(event) {
+  worker.terminate();
+
+  var N = 1 << 0,
+      S = 1 << 1,
+      W = 1 << 2,
+      E = 1 << 3;
+
+  var cells = event.data,
+      distance = 0,
+      visited = new Array(width * height),
+      frontier = [(height - 1) * width];
+
+  function flood() {
+    var frontier1 = [],
+        i0,
+        n0 = frontier.length,
+        i1;
+
+    for (var i = 0; i < n0; ++i) {
+      i0 = frontier[i] << 2;
+      if (tmask && tmask.data[i0 + 3]) {
+          image.data[i0 + 0] = dhakapx.data[i0 + 0];
+          image.data[i0 + 1] = dhakapx.data[i0 + 1];
+          image.data[i0 + 2] = dhakapx.data[i0 + 2];
+          image.data[i0 + 3] = dhakapx.data[i0 + 3];
+          //image.data[i0 + 3] = 0;
+      } else {
+          image.data[i0 + 0] = image.data[i0 + 1] = image.data[i0 + 2] = 0;
+          image.data[i0 + 3] = 255;
+      }
+    }
+
+    for (var i = 0; i < n0; ++i) {
+      i0 = frontier[i];
+      if (cells[i0] & E && !visited[i1 = i0 + 1]) visited[i1] = true, frontier1.push(i1);
+      if (cells[i0] & W && !visited[i1 = i0 - 1]) visited[i1] = true, frontier1.push(i1);
+      if (cells[i0] & S && !visited[i1 = i0 + width]) visited[i1] = true, frontier1.push(i1);
+      if (cells[i0] & N && !visited[i1 = i0 - width]) visited[i1] = true, frontier1.push(i1);
+    }
+
+    frontier = frontier1;
+    return !frontier1.length;
+  }
+
+  d3.timer(function() {
+    for (var i = 0, done; i < floodSpeed && !(done = flood()); ++i);
+    context.putImageData(image, 0, 0);
+    if (done) { location.reload(); };
+    return done;
+  });
+
+});
+
+var socket = io.connect('/cpu');
+var lastUpdate = Date.now();
+// Update the graph when we get new data from the server
+socket.on('key_data', function(data) {
+    if (data == 120 || data == 24 || data == "B" || data == "F") {
+	if(floodSpeed < 100)
+		floodSpeed = Math.min(100, (floodSpeed + 1) * 4);
+	else
+		floodSpeed = floodSpeed + 10;
+	lastUpdate = Date.now()
+	console.log(floodSpeed);
+    }
+});
+// Every 200 ms, check if last update was a long time ago. If so, stop.
+window.setInterval(function() { 
+    if (Date.now() - lastUpdate > 200 && floodSpeed > 0) {
+	floodSpeed = Math.floor(floodSpeed / 4);
+	console.log(floodSpeed);
+    }
+}, 200);
+// Send a key_press up to the server
+document.addEventListener("keydown", function (e) {
+    var keyCode = e.keyCode;
+    if (keyCode == 37) {
+        socket.emit('left');
+    } else if (keyCode == 39) {
+        socket.emit('right');
+    }
+}, false);
+
+</script>
+</body>
