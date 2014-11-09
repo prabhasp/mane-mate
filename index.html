@@ -2,8 +2,6 @@
 <meta charset="utf-8">
 <body style="background:black; overflow: hidden;">
 <div style="position:relative;width:1280px; height: 800px; overflow: hidden;"> 
-  <img id="paper" src="static/img/paper.jpg" width="1280" height="800" 
-       style="position:absolute; left:0; top:0;"></img>
   <canvas id="canvas" style="position:absolute; left: 0; top: 0" width="1280" height="800"></canvas>
   <canvas id="trans-c" width="1280" height="800" style="position:absolute; top: 800; visibility: hidden"></canvas>
   <canvas id="dhaka-c" width="1280" height="800" style="position:absolute; top: 800; visibility: hidden"></canvas>
@@ -60,11 +58,14 @@ worker.addEventListener("message", function(event) {
       frontier = [(height - 1) * width];
 
   function flood() {
+    /* When flood() is called once, the pixel in the frontier is colored, and frontier1 is calculated.
+     * Changes can be batched by simply calling flood() multiple times before actually drawing the image.*/
     var frontier1 = [],
         i0,
         n0 = frontier.length,
         i1;
 
+    /* Color the frontier */
     for (var i = 0; i < n0; ++i) {
       i0 = frontier[i] << 2;
       if (tmask && tmask.data[i0 + 3]) {
@@ -79,6 +80,7 @@ worker.addEventListener("message", function(event) {
       }
     }
 
+    /* Calculate frontier1, which then becomes frontier for the next iteration. */
     for (var i = 0; i < n0; ++i) {
       i0 = frontier[i];
       if (cells[i0] & E && !visited[i1 = i0 + 1]) visited[i1] = true, frontier1.push(i1);
@@ -86,16 +88,28 @@ worker.addEventListener("message", function(event) {
       if (cells[i0] & S && !visited[i1 = i0 + width]) visited[i1] = true, frontier1.push(i1);
       if (cells[i0] & N && !visited[i1 = i0 - width]) visited[i1] = true, frontier1.push(i1);
     }
-
     frontier = frontier1;
-    return !frontier1.length;
+    // What was the last added pixel? Was it part of the image?
+    if (frontier1.length) {
+        i1 = frontier1[frontier1.length - 1];
+        // Convert i1 to the image co-ordinate space
+        i1 = i1 << 2;
+        if (tmask.data[i1 + 3] === 0) { 
+            return {done: false, part_of_image: false};
+        } else {
+            return {done: false, part_of_image: true};
+        }
+    }
+    return {done: true};
   }
 
   d3.timer(function() {
-    for (var i = 0, done; i < floodSpeed && !(done = flood()); ++i);
-    context.putImageData(image, 0, 0);
-    if (done) { location.reload(); };
-    return done;
+      for (var i = 0; i < floodSpeed; ++i) {
+          var f = flood();
+          if (f.done) { location.reload(); return done; };
+          if (!f.part_of_image) --i; 
+      }
+      context.putImageData(image, 0, 0);
   });
 
 });

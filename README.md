@@ -15,6 +15,8 @@ pip install -r requirements.txt
 ```
 You may need to [install pip](http://pip.readthedocs.org/en/latest/installing.html), or other [dependencies for gevent](http://stackoverflow.com/questions/6431096/gevent-does-not-install-properly-on-ubuntu)
 
+Fill up the `img` and the `maneimg` folder, inside static. Content is [here](https://github.com/prabhasp/dhaka-mane)
+
 Run the server:
 ```
 python serve.py

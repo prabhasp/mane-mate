@@ -9,20 +9,26 @@ from socketio import socketio_manage
 from socketio.server import SocketIOServer
 from socketio.namespace import BaseNamespace
 from socketio.mixins import BroadcastMixin
-ser = serial.Serial('/dev/ttyUSB0', 19200, timeout=100)
+
+try:
+    ser = serial.Serial('/dev/ttyUSB0', 19200, timeout=100)
+except OSError:
+    print "NO USB PORT"
+    ser = None
  
 class CPUNamespace(BaseNamespace, BroadcastMixin):
     def recv_connect(self):
         def send_ser():
             while 1:
-                print "waiting..."
                 try:
                     x = ser.read()
                     if len(x) > 0:
                         print ord(x), x
                         self.emit('key_data', ord(x))
                     ser.flushInput()
-                except (serial.SerialException, AttributeError):
+                except AttributeError:
+                    print "NO SIGNAL"
+                except serial.SerialException:
                     print "Some error occurred, sleeping for 0.1 seconds"
                 gevent.sleep(0.1)
         self.spawn(send_ser)
