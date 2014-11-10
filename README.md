@@ -5,7 +5,7 @@ This is an art project for [Yantra 3.0](http://www.karkhana.asia/yantra/) Art & 
 
 License for images is [CC by SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/)
 
-The flooding visualization is derived from [https://gist.github.com/mbostock/949c772b81296f8e4188](@mbostock).
+The flooding visualization is derived from [@mbostock](http://bl.ocks.org/mbostock/949c772b81296f8e4188).
 
 Running the project
 ---
